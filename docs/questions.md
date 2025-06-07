@@ -32,7 +32,7 @@
 Успешное чтение: Если вы читаете из закрытого канала, вы получите нулевое значение типа, который хранится в канале, и второй возвращаемый параметр (если используется) будет равен false, что указывает на то, что канал закрыт и больше не будет значений.
 ```
 Практическое задание:
-- https://pastebin.com/raw/hqZfx8Kk
+- https://pastebin.com/raw/PpCZyfd2
 - https://ya.cc/t/lkIIDcjR5n5E9L
 
 ```go
@@ -46,36 +46,42 @@ package main
 import "fmt"
 
 type Order struct {
-	ID   int
-	Data string
+   ID   int
+   Data string
 }
 
+var Results map[Order]string // Не инициировано
+
 func processOrders() {
-	orders := make(chan Order)   // канал для заказов
-	results := make(chan string) // канал для результатов
+   orders := make(chan Order) // канал для заказов
+   //var results chan string // 1. Не иницирована
+   results := make(chan string) // канал для результатов
 
-	// Горутина для обработки заказов
-	go func() {
-		for order := range orders {
-			// Обработка заказа
-			result := fmt.Sprintf("Заказ %d обработан", order.ID)
-			results <- result
-		}
-	}()
+   // Горутина для обработки заказов
+   go func() {
+      for order := range orders {
+         // Обработка заказа
+         result := fmt.Sprintf("Заказ %d обработан", order.ID)
+         results <- result
 
-	// Основной цикл
-	for i := 1; i <= 3; i++ { // 2. нужно выносить во вторую горутину
-		orders <- Order{ID: i, Data: "данные"}
-		// fmt.Println(<-results) // 1. будет deadlock
-	}
+         Results[order] = order.Data // 4. Тут гонка данных
+      }
+   }()
 
-	close(orders)
-	close(results) // 3. будет паника, если третья первая горутина не успеет все записать
+   // Основной цикл
+   for i := 1; i <= 3; i++ { // 2. нужно выносить во вторую горутину
+      orders <- Order{ID: i, Data: "данные"}
+      // fmt.Println(<-results) // 1. будет deadlock
+   }
+
+   close(orders)
+   close(results) // 3. будет паника, если третья первая горутина не успеет все записать
 }
 
 func main() {
-	processOrders()
+   processOrders()
 }
+
 
 ```
 
@@ -93,32 +99,45 @@ func main() {
 Указатели на структуры не могут быть использованы в качестве ключей, так как указатели сравниваются по адресу, а не по значению.
 ```
 Практическое задание:
-- https://pastebin.com/raw/xdxmJyJ4
+- https://pastebin.com/raw/dFdQriH1
+
 ```go
 package main
 
-import (
-	"fmt"
-)
+import "fmt"
 
 type Point struct {
-	X, Y int
+   X, Y int
+   Z    *string
 }
 
 func main() {
-	// Создаем мапу с ключами типа Point
-	points := make(map[Point]string)
+   // Создаем мапу с ключами типа Point
+   points := make(map[Point]string)
 
-	// Создаем указатель на структуру Point
-	p1 := &Point{X: 1, Y: 2}
+   // Создаем указатель на структуру Point
+   p1 := &Point{X: 1, Y: 2}
 
-	// Попытка использовать указатель на структуру в качестве ключа
-	// Это вызовет ошибку, так как указатели не могут быть ключами в мапе
-	points[p1] = "Point A" // 1. *p1 можно
+   // Попытка использовать указатель на структуру в качестве ключа
+   // Это вызовет ошибку, так как указатели не могут быть ключами в мапе
+   //points[p1] = "Point A" // 1. *p1 можно
 
-	// Доступ к элементам мапы
-	fmt.Println(points[*p1])
+   points[*p1] = "Point A"
+
+   stKey := "Some string"
+   //p2 := &Point{Z: stKey} // 2. Тут ошибка, нужно по укзателю
+   p2 := &Point{Z: &stKey}
+
+   points[*p2] = "Point B"
+
+   //result1 := &points[*p1] // 3. Получение значения по указателю нельзя в мапе
+   result1 := points[*p1]
+   result2 := points[*p2]
+
+   fmt.Printf(result1)
+   fmt.Printf(result2)
 }
+
 
 ```
 
